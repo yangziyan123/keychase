@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3ecde" />
+    <link rel="icon" href="data:," />
+    <title>键盘追缉</title>
+  </head>
+  <body>
+    <main class="game" id="app" data-state="loading">
+      <header class="dashboard">
+        <h1 class="wordmark"><span class="wordmark-icon" aria-hidden="true"></span>键盘追缉</h1>
+        <dl class="metrics" aria-label="对局数据">
+          <div class="metric distance"><dt>已跑</dt><dd><span id="distance">0.0</span> <small>米</small></dd></div>
+          <div class="metric gap" id="gap-metric"><dt>相距</dt><dd><span id="gap">16.0</span> <small>米</small></dd></div>
+          <div class="metric"><dt>小偷</dt><dd><span id="speed">0.0</span> <small>m/s</small></dd></div>
+          <div class="metric"><dt>警察</dt><dd><span id="police-speed">0.0</span> <small>m/s</small></dd></div>
+          <div class="metric"><dt>打字速度</dt><dd><span id="rate">—</span> <small id="rate-unit">词/分</small></dd></div>
+          <div class="metric"><dt>正确率</dt><dd><span id="accuracy">—</span><small id="accuracy-unit" hidden>%</small></dd></div>
+        </dl>
+      </header>
+
+      <div class="playfield">
+        <div class="stage">
+          <div id="view" class="view" aria-label="实时街区画面"></div>
+          <div id="overlay" class="overlay">
+            <p id="loading" role="status">正在载入街区…</p>
+            <p id="error" role="alert" hidden></p>
+            <div id="result" class="result" hidden>
+              <p id="result-status" role="status"></p>
+              <p class="result-distance" id="result-distance" hidden></p>
+              <button id="replay" class="button primary" type="button" hidden>再跑一局</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="typing" id="typing">
+          <div class="article-window" id="article-window" aria-hidden="true" lang="en">
+            <div class="article-track" id="article-track"></div>
+          </div>
+          <div class="typing-footer">
+            <p id="hint"></p>
+            <input id="typing-input" type="text" lang="en" aria-label="按原文输入" aria-describedby="hint active-character" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" disabled />
+          </div>
+          <span class="sr-only" id="active-character"></span>
+          <span class="sr-only" role="status" id="typing-status"></span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="languages" role="group" aria-label="文章语言">
+          <button type="button" class="button" id="en" aria-pressed="true" lang="en" disabled>English</button>
+          <button type="button" class="button" id="zh" aria-pressed="false" disabled>中文</button>
+        </div>
+        <div class="map-controls">
+          <span class="seed">种子 <output id="seed"></output></span>
+          <button type="button" class="button" id="shuffle" disabled>换地图</button>
+        </div>
+        <div class="run-controls">
+          <button type="button" class="button" id="auto-run" aria-pressed="false" hidden disabled>自动跑</button>
+          <button type="button" class="button" id="mute" aria-pressed="false" disabled>静音</button>
+          <button type="button" class="button" id="reset" disabled>重开</button>
+          <button type="button" class="button" id="pause" disabled>暂停</button>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
