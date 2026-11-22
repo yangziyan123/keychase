@@ -16,7 +16,6 @@ const result = get("result");
 const replay = get("replay");
 const resultDistance = get("result-distance");
 const typingStatus = get("typing-status");
-const gapMetric = get("gap-metric");
 const accuracyUnit = get("accuracy-unit");
 const metrics = Object.fromEntries(["distance", "gap", "speed", "police-speed", "rate", "accuracy"].map((id) => [id, get(id)]));
 const controls = Object.fromEntries(["en", "zh", "reset", "pause", "shuffle", "mute"].map((id) => [id, get(id)]));
@@ -101,7 +100,6 @@ async function main() {
     text(metrics.rate, String(chase.rate ?? "—"));
     text(metrics.accuracy, String(chase.accuracy ?? "—"));
     accuracyUnit.hidden = chase.accuracy === null;
-    gapMetric.dataset.close = String(gap <= 5);
     showArticle(chase.articleIndex, chase.index, language);
   }
 
@@ -237,7 +235,8 @@ async function main() {
     const now = performance.now();
     advance(now);
     if (dirty) {
-      street.draw(chase, Math.min(.10, (now - drawnAt) / 1000));
+      const warning = street.draw(chase, Math.min(.10, (now - drawnAt) / 1000));
+      if (app.dataset.policeWarning !== warning) app.dataset.policeWarning = warning;
       drawnAt = now;
       dirty = false;
       show();

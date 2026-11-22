@@ -9,6 +9,7 @@ import { CHUNK_LENGTH, STREET_HALF_DEPTH, createRoute } from "./route.js";
 const easing = (value) => THREE.MathUtils.smoothstep(value, 0, 1);
 const gesture = (elapsed, duration, easeIn, easeOut) =>
   easing(elapsed / easeIn) * easing((duration - elapsed) / easeOut);
+const POLICE_DANGER_DISTANCE = 10;
 const THIEF_ACTIONS = [
   { name: "glance", x: THIEF_START + 2.8 },
   { name: "wave", x: -3.0 },
@@ -156,6 +157,9 @@ export async function createStreet(view) {
   camera.layers.enable(FOREGROUND_LAYER);
   const focus = new THREE.Vector3(0, 2.31, -1.16);
   const cameraOffset = new THREE.Vector3(15, 22, 30);
+  const viewProjection = new THREE.Matrix4();
+  const cameraFrustum = new THREE.Frustum();
+  const policeBounds = new THREE.Sphere(new THREE.Vector3(), 1.4);
   let visibleRouteRadius = 55;
   let route;
   let follow;
@@ -249,7 +253,15 @@ export async function createStreet(view) {
       }
       camera.position.copy(focus).add(cameraOffset);
       camera.lookAt(focus);
+      camera.updateMatrixWorld();
+      cameraFrustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      policeBounds.center.copy(police.model.position).y += 1.18;
+      let warning = "none";
+      if (cameraFrustum.intersectsSphere(policeBounds)) {
+        warning = chase.gap <= POLICE_DANGER_DISTANCE ? "danger" : "caution";
+      }
       cutaway.render(scene, camera, thief.model);
+      return warning;
     },
   };
 }

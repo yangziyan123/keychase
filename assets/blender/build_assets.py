@@ -174,10 +174,12 @@ def export(name, objects, *, compress=False, extras=False):
 merged = {}
 
 
-def add_surface(obj, transform):
+def add_surface(obj, transform, finishes=None):
     indices = defaultdict(dict)
     for poly in obj.data.polygons:
         mat = obj.data.materials[poly.material_index]
+        if finishes is not None:
+            mat = finishes[mat.name]
         points, polygons = merged.setdefault(mat, ([], []))
         remap = indices[mat]
         for vertex in poly.vertices:
@@ -263,6 +265,23 @@ block(0, 0, .030, 1.12, 6.94, .014, "asphalt")
 for line in range(9):
     block(0, -3.02 + line * .755, .045, .92, .283, .014, "stripe")
 pack_paving("crosswalk")
+
+bend_keys = ("bend-left", "bend-right")
+with bpy.data.libraries.load(str(LIBRARY / "bend-kit.blend"), link=True) as (incoming, outgoing):
+    outgoing.collections = list(bend_keys)
+
+# Use the same finishes on both sides of each straight-to-bend seam.
+paving_finishes = {mat.name: mat for mat in surfaces.values()}
+for item in assets[streetscape["sidewalk"]].all_objects:
+    if item.type == 'MESH':
+        paving_finishes.update((mat.name, mat) for mat in item.data.materials)
+for key, collection in zip(bend_keys, outgoing.collections):
+    root = library_root(key)
+    for item in collection.all_objects:
+        if item.type == 'MESH':
+            add_surface(item, item.matrix_local, paving_finishes)
+    pack_module(root)
+
 export("modules", modules, compress=True, extras=True)
 
-print(f"Exported {len(asset_names) + 2} street modules and both runners")
+print(f"Exported {len(asset_names) + 2 + len(bend_keys)} street modules and both runners")

@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { bendPaving } from "./bend.js";
 import { FOREGROUND_LAYER } from "./cutaway.js";
 import { BEND_APPROACH, BEND_RADIUS, CHUNK_LENGTH, STREET_HALF_DEPTH, randomFor } from "./route.js";
 
 const LANDMARK_INTERVAL = 3;
+const STOREFRONT_INTERVAL = 3;
 const RESIDENTIAL_ROLES = ["cottage", "apartment", "villa", "courtyard"];
 const HALF_FOOTPRINT_ROLES = new Set(["cottage", "villa", "courtyard"]);
+const ROWHOUSE = "rowhouse";
 const BUILDING_GAP = .25;
 const BUILDING_FRONTAGE = 5.75;
 const BUILDING_DEPTH = STREET_HALF_DEPTH - BUILDING_FRONTAGE + BUILDING_GAP / 2;
@@ -20,9 +21,9 @@ const FOREGROUND = 2;
 
 const pick = (options, random) => options[Math.floor(random() * options.length)];
 
-function landmarkOrder(names, seed) {
+function shuffled(names, seed) {
   const order = [...names];
-  const random = randomFor(seed ^ 0x8e41c65a, 0);
+  const random = randomFor(seed, 0);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
@@ -48,7 +49,9 @@ function buildingDistrict(catalog, roles, preferredRole, heightLimit, used, rand
     return { name, role, width, depth, heightLimit: heightLimit / height,
       houseScale: HALF_FOOTPRINT_ROLES.has(role) ? Math.SQRT1_2 : 1 };
   }));
-  return { buildings: [...houses, ...storefronts], storefronts, preferredRole, used, random };
+  // The rowhouse uses storefront dimensions for fitting and can repeat like other homes.
+  const minimumFillWidth = MIN_STOREFRONT_SCALE * catalog.get(ROWHOUSE).width;
+  return { buildings: [...houses, ...storefronts], storefronts, minimumFillWidth, preferredRole, used, random };
 }
 
 function buildingScale(building, scale) {
@@ -62,19 +65,21 @@ function varietyCost(building, { used, preferredRole }, preferHouse) {
 }
 
 const countBuilding = (used, name) => used.set(name, (used.get(name) ?? 0) + 1);
+const canPlaceBuilding = ({ role, name }, used) =>
+  role !== "storefront" || name === ROWHOUSE || !used.has(name);
 
 function fillFrontage(district, start, end, block) {
-  const { buildings, storefronts, used, random } = district;
-  const minimumStoreWidth = MIN_STOREFRONT_SCALE * Math.min(...storefronts.map(({ width }) => width));
+  const { buildings, storefronts, minimumFillWidth, used, random } = district;
   const row = [];
   let remaining = end - start;
   while (true) {
     const scale = .87 + random() * .13;
-    const available = remaining - minimumStoreWidth - 2 * BUILDING_GAP;
+    const available = remaining - minimumFillWidth - 2 * BUILDING_GAP;
     const previous = row.at(-1)?.name;
     const preferHouse = random() < .72;
     let next;
     for (const building of buildings) {
+      if (!canPlaceBuilding(building, used)) continue;
       const size = buildingScale(building, scale);
       const occupied = building.width * size;
       if (occupied > available) continue;
@@ -87,9 +92,9 @@ function fillFrontage(district, start, end, block) {
     remaining -= next.occupied + BUILDING_GAP;
   }
 
-  // Fit one storefront to the remaining width so all gaps stay fixed, including chunk seams.
+  // Fit one storefront or rowhouse to the remaining width to keep frontage gaps fixed.
   const occupied = remaining - BUILDING_GAP;
-  const fillers = storefronts.map(({ name, width }) => {
+  const fillers = storefronts.filter((building) => canPlaceBuilding(building, used)).map(({ name, width }) => {
     const scale = occupied / width;
     const fit = scale + 1e-7 >= MIN_STOREFRONT_SCALE && scale <= 1.14 ? (used.get(name) ?? 0) * .14 : 100;
     return { name, scale, occupied, score: fit + Math.abs(Math.log(scale)) + random() * .08 };
@@ -150,6 +155,7 @@ function fillInterior(free, district) {
     const preferHouse = random() < .72;
     let best;
     for (const candidate of candidates) {
+      if (!canPlaceBuilding(candidate, used)) continue;
       const { name, width, depth } = candidate;
       const style = varietyCost(candidate, district, preferHouse) + random() * .08;
       for (const lot of free) {
@@ -255,6 +261,10 @@ function layOutChunk(index, seed, catalog, roles, landmarks, foregroundSide) {
 }
 
 function layOutBend(piece, seed, catalog, roles) {
+  const paving = {
+    module: piece.turn > 0 ? "bend-right" : "bend-left",
+    x: 0, y: 0, z: 0, batch: PAVING, turn: 0, scale: 1, heightScale: 1,
+  };
   const random = randomFor(seed ^ 0xed93854a, piece.index);
   const role = pick(RESIDENTIAL_ROLES, random);
   const district = buildingDistrict(catalog, roles, role, 6.3, new Map(), random);
@@ -312,7 +322,7 @@ function layOutBend(piece, seed, catalog, roles) {
       turn: Math.atan2(-1, piece.turn),
     };
   });
-  return [...entrance, ...exit, ...corner];
+  return [paving, ...entrance, ...exit, ...corner];
 }
 
 export function createEndlessStreet(library) {
@@ -333,7 +343,7 @@ export function createEndlessStreet(library) {
     const size = bounds.getSize(new THREE.Vector3());
     catalog.set(root.name, { parts, bounds, width: size.x, height: size.y, depth: size.z });
     const role = root.userData.streetRole;
-    if (role) {
+    if (role && root.name !== "arcade") {
       if (!roles.has(role)) roles.set(role, []);
       roles.get(role).push(root.name);
     }
@@ -345,15 +355,16 @@ export function createEndlessStreet(library) {
   const matrix = new THREE.Matrix4();
   let seed;
   let landmarks;
+  let districtRoles;
 
   function build(piece) {
     const chunk = new THREE.Group();
     chunk.name = `Street chunk ${piece.index}`;
     chunk.rotation.y = Math.atan2(-piece.dz, piece.dx);
-    if (piece.turn) chunk.add(...bendPaving(piece.turn, catalog));
+    const chunkRoles = districtRoles[THREE.MathUtils.euclideanModulo(piece.index, STOREFRONT_INTERVAL)];
     const placements = piece.turn
-      ? layOutBend(piece, seed, catalog, roles)
-      : layOutChunk(piece.block, seed, catalog, roles, landmarks, piece.dz > 0 ? -1 : 1);
+      ? layOutBend(piece, seed, catalog, chunkRoles)
+      : layOutChunk(piece.block, seed, catalog, chunkRoles, landmarks, piece.dz > 0 ? -1 : 1);
     const batches = [new Map(), new Map(), new Map()];
     for (const placement of placements) {
       const { module, x, y, z, batch, turn, scale, heightScale } = placement;
@@ -394,7 +405,11 @@ export function createEndlessStreet(library) {
       if (seed === nextSeed) return;
       for (const [index, chunk] of chunks) remove(index, chunk);
       seed = nextSeed;
-      landmarks = landmarkOrder(roles.get("landmark"), seed);
+      landmarks = shuffled(roles.get("landmark"), seed ^ 0x8e41c65a);
+      const storefronts = shuffled(roles.get("storefront").filter((name) => name !== ROWHOUSE), seed ^ 0xc8132f47);
+      // Assign storefronts by route index so bends and chunks loaded out of order use the same spacing.
+      districtRoles = Array.from({ length: STOREFRONT_INTERVAL }, (_, slot) => new Map(roles).set("storefront",
+        [...storefronts.filter((_, index) => index % STOREFRONT_INTERVAL === slot), ROWHOUSE]));
     },
     update(route, police, first, last, origin) {
       const policePiece = route.pieceAt(police);

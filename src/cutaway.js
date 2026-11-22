@@ -1,10 +1,7 @@
 import * as THREE from "three";
 
 export const FOREGROUND_LAYER = 1;
-const WINDOW_SCALE = 2.5;
-const HORIZONTAL_RADIUS = 3.3 * WINDOW_SCALE * 1.5;
-const VERTICAL_RADIUS = 1.68 * WINDOW_SCALE;
-const LOOK_AHEAD = 1.12;
+const WINDOW_RADIUS = 6.1875;
 
 export function createCutaway(renderer) {
   const gl = renderer.getContext();
@@ -68,13 +65,13 @@ export function createCutaway(renderer) {
       renderer.render(scene, camera);
       const viewWidth = camera.right - camera.left;
       const viewHeight = camera.top - camera.bottom;
-      radius.set(HORIZONTAL_RADIUS / viewWidth, VERTICAL_RADIUS / viewHeight);
+      radius.set(WINDOW_RADIUS / viewWidth, WINDOW_RADIUS / viewHeight);
       point.copy(thief.position);
       point.y += 1.02;
       point.project(camera);
-      center.set(.5 + point.x / 2 + LOOK_AHEAD / viewWidth, .5 + point.y / 2);
+      center.set(.5 + point.x / 2, .5 + point.y / 2);
 
-      // Shade only the part of the unobstructed street that the ellipse can show.
+      // Shade only the part of the unobstructed street that the circle can show.
       const { x: width, y: height } = pixelSize;
       const left = Math.max(0, Math.floor((center.x - radius.x) * width) - 1);
       const bottom = Math.max(0, Math.floor((center.y - radius.y) * height) - 1);

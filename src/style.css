@@ -8,7 +8,6 @@
   --chrome-ink: #171512;
   --chrome-accent: #ffda45;
   --chrome-aqua: #85dedf;
-  --chrome-alert: #ff8273;
   --chrome-line: 3px solid var(--chrome-ink);
   --chrome-shadow: 5px 5px 0 var(--chrome-ink);
   --paper: #f8f4e7;
@@ -26,6 +25,14 @@ button, input { font: inherit; }
   width: min(100% - 48px, 1440px);
   margin: clamp(10px, 1.1vh, 18px) auto;
   border: 1px solid transparent;
+}
+.game[data-police-warning="caution"] {
+  --police-warning-color: var(--chrome-accent);
+  --police-warning-opacity: .82;
+}
+.game[data-police-warning="danger"] {
+  --police-warning-color: #ff3648;
+  --police-warning-opacity: 1;
 }
 
 .dashboard, .controls {
@@ -99,7 +106,7 @@ button, input { font: inherit; }
 }
 .metric:first-child { border-inline-start: 0; }
 .metric.distance { background: var(--chrome-aqua); }
-.metric.gap[data-close="true"] { background: var(--chrome-alert); }
+.metric.gap { background: var(--police-warning-color, transparent); }
 .metric dt { font-size: .75rem; font-weight: 750; white-space: nowrap; }
 .metric dd {
   display: flex;
@@ -125,11 +132,25 @@ button, input { font: inherit; }
   border-block: 1px solid #132e32;
 }
 .view {
+  position: relative;
   height: clamp(240px, calc(94.4dvh - 273px), 710px);
   overflow: hidden;
   background: #a6ccbd;
 }
 .view canvas { display: block; width: 100%; height: 100%; }
+.view::after {
+  --warning-color: var(--police-warning-color, transparent);
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  opacity: var(--police-warning-opacity, 0);
+  box-shadow:
+    inset 0 0 0 3px var(--warning-color),
+    inset 0 0 24px 7px var(--warning-color),
+    inset 0 0 56px 9px color-mix(in srgb, var(--warning-color) 62%, transparent);
+  transition: opacity .16s ease-out;
+}
 .overlay {
   position: absolute;
   inset: 0;
@@ -357,5 +378,6 @@ button, input { font: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .view::after { transition: none; }
   .controls .button:enabled:active { transform: none; }
 }
