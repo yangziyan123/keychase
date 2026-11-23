@@ -21,7 +21,7 @@ const accuracyUnit = get("accuracy-unit");
 const metrics = Object.fromEntries(["distance", "gap", "speed", "police-speed", "rate", "accuracy"].map((id) => [id, get(id)]));
 const controls = Object.fromEntries(["en", "reset", "pause", "shuffle", "mute"].map((id) => [id, get(id)]));
 const chineseButton = get("zh");
-const autoRun = import.meta.env.DEV ? get("auto-run") : null;
+const autoRun = import.meta.env.DEV ? document.createElement("button") : null;
 
 function text(element, value) {
   if (element.textContent !== value) element.textContent = value;
@@ -181,6 +181,11 @@ async function main() {
   replay.addEventListener("click", restart);
   controls.pause.addEventListener("click", pause);
   if (autoRun) {
+    autoRun.type = "button";
+    autoRun.className = "button";
+    autoRun.id = "auto-run";
+    autoRun.textContent = "自动跑";
+    autoRun.setAttribute("aria-pressed", "false");
     autoRun.addEventListener("click", () => {
       advance(performance.now());
       if (chase.phase === "finished") restart();
@@ -190,7 +195,7 @@ async function main() {
       show();
       focusInput();
     });
-    autoRun.hidden = autoRun.disabled = false;
+    controls.mute.before(autoRun);
   }
   controls.shuffle.addEventListener("click", () => {
     let next = randomSeed();
