@@ -41,6 +41,9 @@ export function createSound() {
       if (name === "caught") {
         tone(now, 392, 294, .14, .082, "triangle");
         tone(now + .14, 262, 148, .32, .10, "triangle");
+      } else if (name === "reward") {
+        tone(now, 523, 660, .07, .055, "triangle");
+        tone(now + .065, 784, 880, .13, .06, "triangle");
       } else if (name === "wrong") {
         tone(now, 170, 106, .115, .075, "sawtooth");
       } else if (now - lastKey >= .032) {

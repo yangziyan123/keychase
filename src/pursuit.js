@@ -1,14 +1,16 @@
 export const THIEF_START = -19;
 const START_LEAD = 16;
+const POLICE_SLOWDOWN = .2;
 
 export class Pursuit {
   phase = "ready";
   thief = THIEF_START;
   police = THIEF_START - START_LEAD;
   speed = 0;
-  policeSpeed = 0;
   elapsed = 0;
   sinceHit = 0;
+  holdUntil = 0;
+  policeSlowUntil = 0;
 
   constructor(speeds) {
     this.speeds = speeds;
@@ -16,13 +18,22 @@ export class Pursuit {
 
   get distance() { return this.thief - THIEF_START; }
   get gap() { return this.thief - this.police; }
+  get policeSpeed() {
+    if (this.phase === "ready" || this.phase === "finished") return 0;
+    const { policeStartSpeed, policeAcceleration } = this.speeds;
+    const speed = policeStartSpeed + policeAcceleration * this.elapsed;
+    return this.elapsed < this.policeSlowUntil ? speed * (1 - POLICE_SLOWDOWN) : speed;
+  }
 
-  accelerate() {
-    const { baseSpeed, maxSpeed, boost, policeStartSpeed } = this.speeds;
-    if (this.phase === "ready") this.policeSpeed = policeStartSpeed;
+  accelerate(multiplier = 1) {
+    const { baseSpeed, maxSpeed, boost } = this.speeds;
     this.phase = "running";
     this.sinceHit = 0;
-    this.speed = Math.min(maxSpeed, Math.max(baseSpeed, this.speed) + boost);
+    this.speed = Math.min(maxSpeed, Math.max(baseSpeed, this.speed) + boost * multiplier);
+  }
+
+  holdSpeed(seconds) {
+    this.holdUntil = Math.max(this.holdUntil, this.elapsed + seconds);
   }
 
   step(seconds) {
@@ -30,8 +41,8 @@ export class Pursuit {
   }
 
   move(seconds) {
-    const { baseSpeed, brakeDelay, deceleration, policeStartSpeed, policeMaxSpeed, policeAcceleration } = this.speeds;
-    const holdLeft = Math.max(0, brakeDelay - this.sinceHit);
+    const { baseSpeed, brakeDelay, deceleration, policeStartSpeed, policeAcceleration } = this.speeds;
+    const holdLeft = Math.max(0, brakeDelay - this.sinceHit, this.holdUntil - this.elapsed);
     const excess = this.speed - baseSpeed;
     const timeToFloor = deceleration > 0 ? excess / deceleration : Infinity;
     const thiefTravel = (time) => {
@@ -39,12 +50,11 @@ export class Pursuit {
       const braking = Math.min(time - held, timeToFloor);
       return baseSpeed * time + excess * (held + braking) - .5 * deceleration * braking ** 2;
     };
-    const timeToPoliceCap = policeAcceleration > 0 ? (policeMaxSpeed - this.policeSpeed) / policeAcceleration : Infinity;
-    const policeTravel = (time) => {
-      const accelerating = Math.min(time, timeToPoliceCap);
-      return this.policeSpeed * accelerating + .5 * policeAcceleration * accelerating ** 2
-        + policeMaxSpeed * (time - accelerating);
-    };
+    const policeBaseSpeed = policeStartSpeed + policeAcceleration * this.elapsed;
+    const policeTravelAtFullSpeed = (time) => policeBaseSpeed * time + .5 * policeAcceleration * time ** 2;
+    const slowLeft = Math.max(0, this.policeSlowUntil - this.elapsed);
+    const policeTravel = (time) => policeTravelAtFullSpeed(time)
+      - POLICE_SLOWDOWN * policeTravelAtFullSpeed(Math.min(time, slowLeft));
     const gap = this.gap;
     const captured = (time) => policeTravel(time) - thiefTravel(time) >= gap;
     const caught = captured(seconds);
@@ -64,12 +74,10 @@ export class Pursuit {
     this.thief += thiefTravel(duration);
     this.police += policeTravel(duration);
     this.speed = Math.max(baseSpeed, this.speed - deceleration * Math.max(0, duration - holdLeft));
-    this.policeSpeed = Math.min(policeMaxSpeed, policeStartSpeed + policeAcceleration * this.elapsed);
     if (!caught) return;
 
     this.police = this.thief;
     this.phase = "finished";
     this.speed = 0;
-    this.policeSpeed = 0;
   }
 }

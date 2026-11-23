@@ -24,13 +24,15 @@ export function createArticleView(viewport, track, instruction) {
   let characterIndex = 0;
   let letters;
   let current;
+  let challenge;
+  let targetLetters = [];
 
   function align() {
     if (current) viewport.scrollTop = current.offsetTop - letters[0].offsetTop;
   }
   new ResizeObserver(align).observe(viewport);
 
-  return function show(nextArticleIndex, nextCharacterIndex, nextLanguage = "en") {
+  return function show(nextArticleIndex, nextCharacterIndex, nextLanguage = "en", nextChallenge = null) {
     if (language !== nextLanguage || articleIndex !== nextArticleIndex) {
       language = nextLanguage;
       articleIndex = nextArticleIndex;
@@ -41,6 +43,12 @@ export function createArticleView(viewport, track, instruction) {
       letters = passage.letters;
       current = undefined;
       track.replaceChildren(passage.node, preview.node);
+    }
+    if (challenge !== nextChallenge) {
+      for (const letter of targetLetters) letter.classList.remove("bend-target");
+      challenge = nextChallenge;
+      targetLetters = challenge?.articleIndex === articleIndex ? letters.slice(challenge.start, challenge.end) : [];
+      for (const letter of targetLetters) letter.classList.add("bend-target");
     }
     if (current && characterIndex === nextCharacterIndex) return;
 

@@ -3,6 +3,7 @@ import { createStreet } from "./street.js";
 import { Chase } from "./chase.js";
 import { createSound } from "./sound.js";
 import { connectTypingInput } from "./typing-input.js";
+import { createRewardGuide, createRewardView } from "./reward-view.js";
 import "./style.css";
 
 const get = (id) => document.getElementById(id);
@@ -18,7 +19,8 @@ const resultDistance = get("result-distance");
 const typingStatus = get("typing-status");
 const accuracyUnit = get("accuracy-unit");
 const metrics = Object.fromEntries(["distance", "gap", "speed", "police-speed", "rate", "accuracy"].map((id) => [id, get(id)]));
-const controls = Object.fromEntries(["en", "zh", "reset", "pause", "shuffle", "mute"].map((id) => [id, get(id)]));
+const controls = Object.fromEntries(["en", "reset", "pause", "shuffle", "mute"].map((id) => [id, get(id)]));
+const chineseButton = get("zh");
 const autoRun = import.meta.env.DEV ? get("auto-run") : null;
 
 function text(element, value) {
@@ -38,6 +40,10 @@ const errorMessage = "输错了，请重试高亮的字符。";
 async function main() {
   const street = await createStreet(view);
   const showArticle = createArticleView(get("article-window"), get("article-track"), get("active-character"));
+  const showRewards = createRewardView(get("bend-rewards"), get("reward-feedback"), get("reward-announcement"));
+  const guideButton = get("reward-guide-button");
+  const guide = get("reward-guide");
+  const openGuide = createRewardGuide(guideButton, guide);
   const sound = createSound();
   const clearInput = connectTypingInput(input, submit, sound.unlock);
   const url = new URL(window.location.href);
@@ -50,6 +56,8 @@ async function main() {
   let dirty = true;
   let errorTimer;
   let muted = false;
+  let heardReward;
+  let resumeAfterGuide = false;
 
   function focusInput() {
     if (canType()) input.focus({ preventScroll: true });
@@ -100,12 +108,17 @@ async function main() {
     text(metrics.rate, String(chase.rate ?? "—"));
     text(metrics.accuracy, String(chase.accuracy ?? "—"));
     accuracyUnit.hidden = chase.accuracy === null;
-    showArticle(chase.articleIndex, chase.index, language);
+    showArticle(chase.articleIndex, chase.index, language, chase.challengeTarget);
+    showRewards(chase);
+    if (heardReward !== chase.rewardNotice) {
+      heardReward = chase.rewardNotice;
+      if (heardReward) sound.play("reward");
+    }
   }
 
   function restart() {
-    chase = new Chase(language);
-    street.reset(seed);
+    chase = new Chase(language, seed);
+    street.reset(seed, chase.route);
     simulatedAt = performance.now();
     dirty = true;
     clearInput();
@@ -118,7 +131,8 @@ async function main() {
     if (url.href !== location.href) history.replaceState(null, "", url);
     input.lang = language === "zh" ? "zh-CN" : "en";
     text(get("rate-unit"), language === "zh" ? "字/分" : "词/分");
-    for (const code of ["en", "zh"]) controls[code].setAttribute("aria-pressed", String(code === language));
+    controls.en.setAttribute("aria-pressed", String(language === "en"));
+    chineseButton.setAttribute("aria-pressed", String(language === "zh"));
     show();
     if (!document.hidden) focusInput();
   }
@@ -143,8 +157,12 @@ async function main() {
     else focusInput();
   }
 
-  function submit(value) {
+  function submit(value, commandKey = false) {
     advance(performance.now());
+    if (commandKey && !chase.rewardCommand && !(value === "@" && chase.canStartRewardCommand)) {
+      show();
+      return;
+    }
     const { correct, wrong } = chase.submit(value);
     show();
     if (!correct && !wrong) return;
@@ -186,16 +204,28 @@ async function main() {
     sound.mute(muted);
     focusInput();
   });
-  for (const code of ["en", "zh"]) {
-    controls[code].addEventListener("click", () => {
-      if (language === code) {
-        focusInput();
-        return;
-      }
-      language = code;
-      restart();
-    });
-  }
+  controls.en.addEventListener("click", () => {
+    if (language === "en") {
+      focusInput();
+      return;
+    }
+    language = "en";
+    restart();
+  });
+  guideButton.addEventListener("click", () => {
+    resumeAfterGuide = false;
+    if (chase.phase === "running") {
+      pause();
+      resumeAfterGuide = chase.phase === "paused";
+    }
+    openGuide();
+  });
+  guide.addEventListener("close", () => {
+    const resume = resumeAfterGuide && chase.phase === "paused" && !document.hidden;
+    resumeAfterGuide = false;
+    if (resume) pause();
+    else guideButton.focus({ preventScroll: true });
+  });
 
   typing.addEventListener("click", focusInput);
   view.addEventListener("click", focusInput);
@@ -203,8 +233,16 @@ async function main() {
     if (document.hidden && chase.phase === "running") pause();
   });
   document.addEventListener("keydown", (event) => {
+    if (guide.open) return;
     if (event.isComposing || input.dataset.composing === "true" || event.keyCode === 229) return;
     if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (canType() && chase.rewardCommand && (event.key === "Escape" || event.key === "Backspace")) {
+      event.preventDefault();
+      advance(performance.now());
+      chase.editRewardCommand(event.key);
+      show();
+      return;
+    }
     if (event.key === "Escape" && !event.repeat && ["running", "paused"].includes(chase.phase)) {
       event.preventDefault();
       pause();
@@ -217,6 +255,11 @@ async function main() {
       return;
     }
     sound.unlock();
+    if (chase.rewardCommand || (event.key === "@" && chase.canStartRewardCommand)) {
+      event.preventDefault();
+      submit(event.key, true);
+      return;
+    }
     if (event.target === input) return;
     focusInput();
     if (language === "en") {
@@ -226,6 +269,7 @@ async function main() {
   });
 
   for (const control of Object.values(controls)) control.disabled = false;
+  guideButton.disabled = false;
   input.disabled = false;
   get("loading").hidden = true;
   restart();

@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f3ecde" />
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/png" href="./assets/keychase-logo-clean.png" />
     <title>键盘追缉</title>
   </head>
   <body>
     <main class="game" id="app" data-state="loading">
       <header class="dashboard">
-        <h1 class="wordmark"><span class="wordmark-icon" aria-hidden="true"></span>键盘追缉</h1>
+        <h1 class="wordmark"><img class="wordmark-icon" src="./assets/keychase-logo-clean.png" alt="" width="48" height="48" />键盘追缉</h1>
         <dl class="metrics" aria-label="对局数据">
           <div class="metric distance"><dt>已跑</dt><dd><span id="distance">0.0</span> <small>米</small></dd></div>
           <div class="metric gap" id="gap-metric"><dt>相距</dt><dd><span id="gap">16.0</span> <small>米</small></dd></div>
@@ -24,6 +24,25 @@
       <div class="playfield">
         <div class="stage">
           <div id="view" class="view" aria-label="实时街区画面"></div>
+          <aside class="bend-rewards" id="bend-rewards" aria-label="弯道奖励" hidden>
+            <div class="reward-heading"><strong>弯道奖励</strong><span class="reward-timer"></span></div>
+            <div class="reward-time-track" aria-hidden="true"><span class="reward-time-bar"></span></div>
+            <div class="reward-cards"></div>
+            <p class="reward-prompt"></p>
+          </aside>
+          <div id="reward-feedback" class="reward-feedback" hidden></div>
+          <span class="sr-only" id="reward-announcement" role="status"></span>
+          <button type="button" id="reward-guide-button" class="reward-guide-button"
+            aria-label="弯道奖励图鉴" aria-haspopup="dialog" aria-controls="reward-guide" title="弯道奖励图鉴" disabled></button>
+          <dialog id="reward-guide" class="reward-guide" aria-labelledby="reward-guide-title">
+            <header class="reward-guide-heading">
+              <h2 id="reward-guide-title">弯道奖励图鉴</h2>
+              <form method="dialog">
+                <button type="submit" class="reward-guide-close" aria-label="关闭弯道奖励图鉴" autofocus>×</button>
+              </form>
+            </header>
+            <div class="reward-guide-body"></div>
+          </dialog>
           <div id="overlay" class="overlay">
             <p id="loading" role="status">正在载入街区…</p>
             <p id="error" role="alert" hidden></p>
@@ -51,7 +70,7 @@
       <div class="controls">
         <div class="languages" role="group" aria-label="文章语言">
           <button type="button" class="button" id="en" aria-pressed="true" lang="en" disabled>English</button>
-          <button type="button" class="button" id="zh" aria-pressed="false" disabled>中文</button>
+          <button type="button" class="button" id="zh" aria-pressed="false" disabled>中文（开发中）</button>
         </div>
         <div class="map-controls">
           <span class="seed">种子 <output id="seed"></output></span>

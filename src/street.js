@@ -4,7 +4,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { THIEF_START } from "./pursuit.js";
 import { createCutaway, FOREGROUND_LAYER } from "./cutaway.js";
 import { createEndlessStreet } from "./endless.js";
-import { CHUNK_LENGTH, STREET_HALF_DEPTH, createRoute } from "./route.js";
+import { CHUNK_LENGTH, STREET_HALF_DEPTH } from "./route.js";
 
 const easing = (value) => THREE.MathUtils.smoothstep(value, 0, 1);
 const gesture = (elapsed, duration, easeIn, easeOut) =>
@@ -199,9 +199,9 @@ export async function createStreet(view) {
   sun.shadow.needsUpdate = true;
 
   return {
-    reset(seed) {
+    reset(seed, nextRoute) {
       endless.reset(seed);
-      route = createRoute(seed);
+      route = nextRoute;
       follow = undefined;
       nextAction = 0;
       actionCycle = 0;
